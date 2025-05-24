@@ -18,21 +18,75 @@
 #include <stdio.h>
 #include "nstdio.h"
 
+// Maximum size for an input segment
+#define SEGMENT_SIZE 100
+
+// Character conversion macros
 #define TOUPPER(c) (((c) >= 'a' && (c) <= 'z')? 'A'+(c)-'a' : (c))
 #define TOLOWER(c) (((c) >= 'A' && (c) <= 'Z')? 'a'+(c)-'A' : (c))
 
-#define isDigit(c) ((c) >= '0' && (c) <= '9')
-#define isByte(c) (isDigit(c) || (TOUPPER(c) >= 'A' && TOUPPER(c) <= 'F'))
+// Character type checks
 #define isLetter(c) (TOUPPER(c) >= 'A' && TOUPPER(c) <= 'Z')
+#define isDigit(c) ((c) >= '0' && (c) <= '9')
+#define TODIGIT(c) ((isDigit(c))? (c) - '0': 'c')
+#define isNibble(c) (isDigit(c) || (TOUPPER(c) >= 'A' && TOUPPER(c) <= 'F'))
 
+// Prototypes for internal validation and conversion functions
+/**
+ * @brief Checks whether the given string represents a valid integer number.
+ *
+ * @param str Null-terminated string to validate.
+ * @return 1 if valid integer format, 0 otherwise.
+ */
 static uint8_t isInt(const char *str);
+
+/**
+ * @brief Checks whether the given string represents a valid floating-point number.
+ *
+ * @param str Null-terminated string to validate.
+ * @return 1 if valid float format, 0 otherwise.
+ */
 static uint8_t isFloat(const char *str);
+
+/**
+ * @brief Checks whether the given string represents a valid hexadecimal number.
+ *
+ * @param str Null-terminated string to validate.
+ * @return 1 if valid hex format, 0 otherwise.
+ */
 static uint8_t isHex(const char *str);
 
+/**
+ * @brief Converts a valid integer string to its int value.
+ *
+ * @param str Null-terminated valid integer string.
+ * @return Parsed integer value.
+ */
 static int strToInt(const char *str);
+
+/**
+ * @brief Converts a valid float string to its double value.
+ *
+ * @param str Null-terminated valid float string.
+ * @return Parsed floating-point value.
+ */
 static double strToFloat(const char *str);
+
+/**
+ * @brief Converts a valid hexadecimal string (with "0x" prefix) to uint32_t.
+ *
+ * @param str Null-terminated valid hex string (e.g., "0x1A3F").
+ * @return Parsed hexadecimal value as uint32_t.
+ */
 static uint32_t strToHex(const char *str);
 
+/**
+ * @brief Computes x raised to the power of n.
+ *
+ * @param x Base value.
+ * @param n Non-negative integer exponent.
+ * @return Result of x raised to the power n.
+ */
 static double double_pow(double x, uint8_t n);
 
 /*******************************************************************************
@@ -41,9 +95,75 @@ static double double_pow(double x, uint8_t n);
  *******************************************************************************
  ******************************************************************************/
 
-void nscaf(scanCallback *callbacks, void **destinations, uint8_t count)
+void ClearInputBuffer(void)
 {
+	char c;
+	while((c = getchar()) != '\n' && c != EOF);
+}
 
+void nscanf(scanCallback *callbacks, void **destinations, uint8_t count)
+{
+	char segment[SEGMENT_SIZE];
+	uint8_t segment_index;
+	uint32_t arg_index;
+	int character;
+	uint8_t in_quotes ;
+	uint8_t valid_input;
+
+	do
+	{
+		segment_index = 0;
+		arg_index = 0;
+		in_quotes = 0;
+		valid_input = 1;
+
+		printf("> ");
+
+		while((character = getchar()) != '\n' && character != EOF)
+		{
+			if (character == '"')
+			{
+				// Toggle quotes mode
+				in_quotes = !in_quotes;
+			}
+			else if(character == ' ' && !in_quotes)
+			{
+				// End of a segment
+				if(segment_index > 0 && arg_index < count)
+				{
+					segment[segment_index] = '\0';
+					if (!callbacks[arg_index](segment, destinations[arg_index]))
+					{
+						valid_input = 0;            // Mark input as invalid
+					}
+					arg_index++;
+					segment_index = 0;
+				}
+			}
+			else
+			{
+				if(segment_index < sizeof(segment) -1)
+				{
+					segment[segment_index++] = (char) character;
+				}
+			}
+		}
+
+		// Process the last segment
+		if (segment_index > 0 && arg_index < count) {
+			segment[segment_index] = '\0';
+			if (!callbacks[arg_index](segment, destinations[arg_index]))
+			{
+				valid_input = 0;            // Mark input as invalid
+			}
+			arg_index++;
+		}
+
+		 // Check if all arguments were parsed
+		if (arg_index < count) {
+			printf("[ERROR] Missing arguments. Expected:%d, Read: %d\n", count, arg_index);
+		}
+	}while(!valid_input || arg_index < count);	// Retry if there was an error
 }
 
 uint8_t readInt(const char *str, void *dest)
@@ -94,11 +214,12 @@ uint8_t readChar(const char *str, void *dest)
 	return 1;
 }
 
-void readString(const char *str, void *dest)
+uint8_t readString(const char *str, void *dest)
 {
 	char *ptr = (char *)dest;
 
 	while((*ptr++ = *str++) != '\0');
+	return 1;
 }
 
 
@@ -117,10 +238,11 @@ static uint8_t isInt(const char *str)
 	}
 	while(*str)
 	{
-		if(!isDigit(*str++))
+		if(!isDigit(*str))
 		{
 			return 0;
 		}
+		str++;
 	}
 	return 1;
 }
@@ -141,12 +263,12 @@ static uint8_t isFloat(const char *str)
 				return 0;
 			}
 			has_dot = 1;
-			str++;
 		}
-		else if(!isDigit(*str++))
+		else if(!isDigit(*str))
 		{
 			return 0;
 		}
+		str++;
 	}
 	return 1;
 }
@@ -164,7 +286,7 @@ static uint8_t isHex(const char *str)
 	str++;
 	while(*str)
 	{
-		if(!isByte(*str))
+		if(!isNibble(*str))
 		{
 			return 0;
 		}
@@ -176,16 +298,16 @@ static uint8_t isHex(const char *str)
 static int strToInt(const char *str)
 {
 	uint8_t i = 0;
-	int num;
+	int num = 0;
 	int8_t sign = 1;
 
 	if(str[i] == '+' || str[i] == '-')
 	{
 		sign = (str[i++] == '+')? 1: -1;
 	}
-	for(num = 0; str[i] != '\0'; i++)
+	for(; str[i] != '\0'; i++)
 	{
-		num = num*10 + (str[i]  - '0');
+		num = num*10 + TODIGIT(str[i]);
 	}
 
 	return sign * num;
@@ -203,7 +325,7 @@ static double strToFloat(const char *str)
 	}
 	for(num = 0; str[i] != '\0' && str[i] != '.' && str[i] != ','; i++)
 	{
-		num = num*10 + (str[i]  - '0');
+		num = num*10 + TODIGIT(str[i]);
 	}
 
 	if(str[i++] == '\0')
@@ -214,7 +336,7 @@ static double strToFloat(const char *str)
 	uint8_t dot_index;
 	for(dot_index = i - 1; str[i] != '\0'; i++)
 	{
-		num = num + (str[i]  - '0') * double_pow(0.1, i-dot_index);
+		num = num + TODIGIT(str[i]) * double_pow(0.1, i-dot_index);
 	}
 
 	return sign * num;
@@ -230,7 +352,7 @@ static uint32_t strToHex(const char *str)
 		num <<= 4;
 		if(isDigit(str[i]))
 		{
-			num += str[i] - '0';
+			num += TODIGIT(str[i]);
 			continue;
 		}
 
@@ -243,7 +365,7 @@ static uint32_t strToHex(const char *str)
 static double double_pow(double x, uint8_t n)
 {
 	double result = 1;
-	for(uint8_t i = 0, result = 1; i < n; i++)
+	for(uint8_t i = 0; i < n; i++)
 	{
 		result *= x;
 	}

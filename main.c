@@ -23,8 +23,6 @@
 #include "lib/nstdio/nstdio.h"
 #include "lib/port_emulator/port_emulator.h"
 
-void ClearInputBuffer();
-
 enum
 {
 	LED_SELECTOR = 0,
@@ -47,20 +45,23 @@ int main() {
 	GPIO_SetMaskedOutput(PORTA, 0xFF, OUTPUT);
 
 	uint8_t prog = RUNNING;
-	uint32_t hex;
-	readHex("0xffff", &hex);
-	printf("%X", hex);
-	showMenu();
 
-	display_leds(15, 0xff);
-	showMenu();
+	scanCallback callback[] = { readInt, readFloat, readHex, readChar, readString};
+	int a;
+	float b;
+	uint32_t c;
+	char d;
+	char e[20];
+	void *destinations[]={ &a, &b, &c, &d, e};
+
+	nscanf(callback, destinations, 5);
+	printf("%d %f %X %c %s\n", a, b, c, d, e);
+
+//	showMenu();
+//
+//	display_leds(15, 0xff);
+//	showMenu();
     return 0;
-}
-
-void ClearInputBuffer(void)
-{
-	char c;
-	while((c = getchar()) != '\n' && c != EOF);
 }
 
 void showMenu() {
