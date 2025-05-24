@@ -24,7 +24,7 @@
 #include "lib/port_emulator/port_emulator.h"
 
 #define MAX_LEDS 16
-#define MAX_DIGITS 2
+#define BUFFER 100
 
 enum
 {
@@ -61,11 +61,11 @@ int main(void)
 	GPIO_SetMaskedOutput(PORTD, ledMaskOn, HIGH);
 	display_leds(ledCount, ledMaskOn);
 
-	while(prog)
+	do
 	{
 		showMenu2(ledCount);
 
-		uint8_t ledSelector = 0;
+		int ledSelector = 0;
 		uint8_t selection = readMenuOption(&ledSelector, ledCount);
 
 		switch(selection)
@@ -102,7 +102,7 @@ int main(void)
 				printf("\t\t\t[ERROR] Invalid command.\n");
 				break;
 		}
-	}
+	}while(prog);
 
 	return 0;
 }
@@ -147,21 +147,25 @@ void showMenu2(int ledCount) {
     printf("\t\t\t [s]    Set (turn on) all LEDs\n");
     printf("\t\t\t [q]    Quit program\n");
     printf("\t\t\t==========================================\n");
-    CLEAR_SCREEN();
 }
 
 uint8_t readMenuOption(int * ledSelector, int ledCount)
 {
-	int ch[MAX_DIGITS];
-	printf("\n\t\t\tEnter an option: ");
+	int ch[BUFFER];
+	printf("\n\n\t\t\tEnter an option: ");
 
 	ch[0] = getchar();
 
 	if(isDigit(ch[0]))
 	{
-		for(uint8_t i = 0; isDigit(ch[i]); i++)
+		uint8_t i;
+		for(i = 0; isDigit(ch[i]); i++, ch[i] = getchar())
 		{
-			*ledSelector = *ledSelector * 10 * i + TODIGIT(ch[i]);
+			*ledSelector = (*ledSelector) * 10 + TODIGIT(ch[i]);
+		}
+		if(ch[i] != '\n')
+		{
+			ClearInputBuffer();
 		}
 
 		if (*ledSelector >= 0 && *ledSelector < ledCount)
