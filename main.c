@@ -24,6 +24,7 @@
 #include "lib/port_emulator/port_emulator.h"
 
 #define MAX_LEDS 16
+#define MAX_DIGITS 2
 
 enum
 {
@@ -41,57 +42,56 @@ enum
 };
 
 void showMenu1(int *ledCount, uint32_t *ledMask);
-void showMenu2(int *ledCount);
+void showMenu2(int ledCount);
+uint8_t readMenuOption(int *ledSelector, int ledCount);
 
 int main(void)
 {
 	uint8_t prog = RUNNING;
 	int ledCount;
-	uint32_t ledMask;
-	showMenu1(&ledCount, &ledMask);
+	uint32_t ledMaskOn;
+	uint32_t ledInitMask = 0;
+	showMenu1(&ledCount, &ledMaskOn);
 	for(uint8_t i = 0; i < ledCount; i++)
 	{
+		ledInitMask <<= 1;
 		GPIO_PinInit(PORTD, i, OUTPUT);
+		ledInitMask += 1;
 	}
-	GPIO_SetMaskedOutput(PORTD, ledMask, HIGH);
-	display_leds(ledCount, ledMask);
+	GPIO_SetMaskedOutput(PORTD, ledMaskOn, HIGH);
+	display_leds(ledCount, ledMaskOn);
 
 	while(prog)
 	{
 		showMenu2(ledCount);
 
-		uint8_t selection = readMenuOption();
+		uint8_t ledSelector = 0;
+		uint8_t selection = readMenuOption(&ledSelector, ledCount);
 
 		switch(selection)
 		{
 			case LED_SELECTOR:
+				ledMaskOn |= (1 << ledSelector);
+				GPIO_SetPinState(PORTD, ledSelector, HIGH);
+				display_leds(ledCount, ledMaskOn);
 				break;
 
 			case NOT_LED:
-				for(int i = 0; i < ledCount; i++)
-				{
-					GPIO_SetPinState(PORTD, i, TOGGLE);
-				}
-				display_leds(ledCount, 0x);
+				ledMaskOn = (~ledMaskOn) & ledInitMask;
+				GPIO_SetMaskedOutput(PORTD, ledInitMask, TOGGLE);
+				display_leds(ledCount, ledMaskOn);
 				break;
 
 			case OFF_ALL:
-				ledMask = 1;
-				for(int i = 0; i < ledCount; i++)
-				{
-					ledMask <<= 1;
-					GPIO_SetPinState(PORTD, i, LOW);
-					ledMask += 1;
-				}
-				display_leds(ledCount, 0x00);
+				ledMaskOn = 0;
+				GPIO_SetMaskedOutput(PORTD, ledInitMask, LOW);
+				display_leds(ledCount, ledMaskOn);
 				break;
 
 			case ON_ALL:
-				for(int i = 0; i < ledCount; i++)
-				{
-					GPIO_SetPinState(PORTD, i, HIGH);
-				}
-				display_leds(ledCount, 0xFF);
+				ledMaskOn = ledInitMask;
+				GPIO_SetMaskedOutput(PORTD, ledInitMask, HIGH);
+				display_leds(ledCount, ledMaskOn);
 				break;
 
 			case FINISH:
@@ -139,14 +139,54 @@ void showMenu1(int *ledCount, uint32_t *ledMask)
 	}while(!validation_led);
 }
 
-void showMenu2(int *ledCount) {
+void showMenu2(int ledCount) {
     printf("\t\t\t=========== LED SIMULATOR MENU ===========\n");
-    printf("\t\t\t [0-%d]  Turn ON a specific LED\n", *ledCount);
+    printf("\t\t\t [0-%d]  Turn ON a specific LED\n", ledCount - 1);
     printf("\t\t\t [t]    Toggle all LEDs\n");
     printf("\t\t\t [c]    Clear (turn off) all LEDs\n");
     printf("\t\t\t [s]    Set (turn on) all LEDs\n");
     printf("\t\t\t [q]    Quit program\n");
     printf("\t\t\t==========================================\n");
-    ClearInputBuffer();
     CLEAR_SCREEN();
+}
+
+uint8_t readMenuOption(int * ledSelector, int ledCount)
+{
+	int ch[MAX_DIGITS];
+	printf("\n\t\t\tEnter an option: ");
+
+	ch[0] = getchar();
+
+	if(isDigit(ch[0]))
+	{
+		for(uint8_t i = 0; isDigit(ch[i]); i++)
+		{
+			*ledSelector = *ledSelector * 10 * i + TODIGIT(ch[i]);
+		}
+
+		if (*ledSelector >= 0 && *ledSelector < ledCount)
+		{
+			return LED_SELECTOR;
+		}
+		else
+		{
+			printf("\t\t\t[ERROR] Invalid LED index.\n");
+			return 0xFF;
+		}
+	}
+	ch[0] = TOLOWER(ch[0]);
+	ClearInputBuffer();
+	switch(ch[0])
+	{
+		case 't':
+			return NOT_LED;
+		case 'c':
+			return OFF_ALL;
+		case 's':
+			return ON_ALL;
+		case 'q':
+			return FINISH;
+		default:
+			return 0xFF;
+	}
 }

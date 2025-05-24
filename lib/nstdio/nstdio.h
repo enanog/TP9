@@ -20,6 +20,16 @@
 #ifndef _NSTDIO_H_
 #define _NSTDIO_H_
 
+// Character conversion macros
+#define TOUPPER(c) (((c) >= 'a' && (c) <= 'z')? 'A'+(c)-'a' : (c))
+#define TOLOWER(c) (((c) >= 'A' && (c) <= 'Z')? 'a'+(c)-'A' : (c))
+
+// Character type checks
+#define isLetter(c) (TOUPPER(c) >= 'A' && TOUPPER(c) <= 'Z')
+#define isDigit(c) ((c) >= '0' && (c) <= '9')
+#define TODIGIT(c) ((isDigit(c))? (c) - '0': 'c')
+#define isNibble(c) (isDigit(c) || (TOUPPER(c) >= 'A' && TOUPPER(c) <= 'F'))
+
 /**
  * @brief Defines a callback function type for parsing input segments.
  * The callback receives a string and a generic pointer to the destination variable.

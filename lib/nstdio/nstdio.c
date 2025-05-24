@@ -21,16 +21,6 @@
 // Maximum size for an input segment
 #define SEGMENT_SIZE 100
 
-// Character conversion macros
-#define TOUPPER(c) (((c) >= 'a' && (c) <= 'z')? 'A'+(c)-'a' : (c))
-#define TOLOWER(c) (((c) >= 'A' && (c) <= 'Z')? 'a'+(c)-'A' : (c))
-
-// Character type checks
-#define isLetter(c) (TOUPPER(c) >= 'A' && TOUPPER(c) <= 'Z')
-#define isDigit(c) ((c) >= '0' && (c) <= '9')
-#define TODIGIT(c) ((isDigit(c))? (c) - '0': 'c')
-#define isNibble(c) (isDigit(c) || (TOUPPER(c) >= 'A' && TOUPPER(c) <= 'F'))
-
 // Prototypes for internal validation and conversion functions
 /**
  * @brief Checks whether the given string represents a valid integer number.
